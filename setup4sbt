@@ -1,0 +1,221 @@
+#!/usr/bin/env perl
+
+use v5.14;
+
+use strict;
+use warnings;
+
+use autodie;
+
+use File::Spec;
+use File::Path qw/make_path/;
+use HTTP::Tiny;
+use version;
+use JSON::PP;
+
+if ( ! $ENV{HARNESS_ACTIVE} ) {
+    main();
+} else {
+    run_tests();
+}
+
+sub main {
+    my $name = shift @ARGV || 'NewProject';
+
+    create_dirs( $name );
+    my $ver = create_build_sbt( $name );
+    create_build_properties( $name );
+    create_plugins_sbt( $name, $ver );
+
+    init_git( $name );
+}
+
+sub init_git {
+    my $name = shift;
+
+    if ( `which git` ) {
+        chdir $name;
+        `git init`;
+
+        open my $fh, '>', File::Spec->catfile( $name, '.gitignore' );
+        print $fh "target/\n";
+        print $fh "*.class\n";
+        close $fh;
+    }
+}
+
+sub run_tests {
+    # do nothing now
+}
+
+sub create_dirs {
+    my $name = shift;
+
+    if ( -d $name ) {
+        die "'$name' already exists.";
+    }
+
+    my $dirs = {
+        src     => [ 'main', 'test' ],
+        sub     => [ 'scala', 'java', 'resources' ],
+        other   => [ 'target', 'lib', 'project' ],
+    };
+
+    # create top dirs
+    make_path( File::Spec->catdir( $name, $_ ) ) for @{ $dirs->{other} };
+
+    # create src dirs
+    for my $src ( @{ $dirs->{src} } ) {
+        for my $sub ( @{ $dirs->{sub} } ) {
+            make_path( File::Spec->catdir( $name, 'src', $src, $sub ) );
+        }
+    }
+}
+
+sub fetch_scala_version {
+    my $site = 'http://www.scala-lang.org/files/archive/';
+    my $res  = HTTP::Tiny->new->get( $site );
+
+    die "Can't fetch scala's version list" unless $res->{success};
+
+    my @result;
+    while ( $res->{content} =~ /<a href="scala-(2\.\d+\.\d+)\.tgz">/g ) {
+        push @result, version->parse( $1 );
+    }
+
+    my @sorted = sort @result;
+
+    return $sorted[-1];
+}
+
+sub fetch_sbt_version {
+    my $site = 'http://dl.bintray.com/sbt/native-packages/sbt/';
+    my $res  = HTTP::Tiny->new->get( $site );
+    
+    die "Can't fetch sbt's version list" unless $res->{success};
+
+    my @result;
+    while ( $res->{content} =~ /href="#(0\.\d+\.\d+)\/"/g ) {
+        push @result, version->parse( $1 );
+    }
+
+    my @sorted = sort @result;
+
+    return $sorted[-1];
+}
+
+sub fetch_specs2_version {
+    my $ver_for_artifact = shift;
+
+    my $site = "http://search.maven.org/solrsearch/select?q=g:%22org.specs2%22+AND+a:%22specs2-core_$ver_for_artifact%22&rows=20&core=gav";
+
+    my $res  = HTTP::Tiny->new->get( $site );
+    
+    die "Can't fetch specs2's info" unless $res->{success};
+
+    my $json = decode_json( $res->{content} );
+    die "Can't fetch specs2's version" unless exists $json->{response}{docs};
+
+    my @result;
+    for my $dist ( @{ $json->{response}{docs} } ) {
+        if ( $dist->{v} =~ /^\d+\.\d+(\.\d+)?$/ ) {
+            push @result, version->parse( $dist->{v} );
+        }
+    }
+
+    if ( ! @result ) {
+        die "Can't get specs2's version";
+    }
+
+    my @sorted = sort @result;
+
+    return $sorted[-1];
+}
+
+sub fetch_scoverage_version {
+    my $ver_for_artifact = shift;
+
+    my $site = "http://search.maven.org/solrsearch/select?q=g:%22org.scoverage%22+AND+a:%22scalac-scoverage-plugin_$ver_for_artifact%22&rows=20&core=gav";
+
+    my $res  = HTTP::Tiny->new->get( $site );
+    
+    die "Can't fetch scoverage's info" unless $res->{success};
+
+    my $json = decode_json( $res->{content} );
+    die "Can't fetch scoverage's version" unless exists $json->{response}{docs};
+
+    my @result;
+    for my $dist ( @{ $json->{response}{docs} } ) {
+        if ( $dist->{v} =~ /^\d+\.\d+(\.\d+)?$/ ) {
+            push @result, version->parse( $dist->{v} );
+        }
+    }
+
+    if ( ! @result ) {
+        die "Can't get scoverage's version";
+    }
+
+    my @sorted = sort @result;
+
+    return $sorted[-1];
+}
+
+
+
+sub create_build_sbt {
+    my $name = shift;
+
+    my $version         = '0.0.1';
+    my $scala_version   = fetch_scala_version();
+
+    my @fragment = split( /\./, $scala_version );
+    my $ver_for_artifact = $fragment[0] . '.' . $fragment[1];
+
+    my $specs2_version = fetch_specs2_version( $ver_for_artifact );
+
+    # fetch testing framework's version
+
+    open my $fh, '>', File::Spec->catfile( $name, 'build.sbt' );
+
+    # name
+    print $fh qq{name := "$name"\n};
+    print $fh "\n";
+
+    # version
+    print $fh qq{version := "$version"\n};
+    print $fh "\n";
+
+    # scala version
+    print $fh qq{scalaVersion := "$scala_version"\n};
+    print $fh "\n";
+
+    # testing framework
+    print $fh qq{libraryDependencies += "org.specs2" % "specs2-core_$ver_for_artifact" % "$specs2_version"\n};
+
+    close $fh;
+
+    return $ver_for_artifact;
+}
+
+sub create_build_properties {
+    my $name = shift;
+
+    my $sbt = fetch_sbt_version();
+
+    open my $fh, '>', File::Spec->catfile( $name, 'project', 'build.properties' );
+    print $fh "sbt.version=$sbt\n";
+    close $fh;
+}
+
+sub create_plugins_sbt {
+    my $name = shift;
+    my $ver_for_artifact = shift;
+    
+    my $scoverage = fetch_scoverage_version( $ver_for_artifact );
+
+    open my $fh, '>', File::Spec->catfile( $name, 'project', 'plugins.sbt' );
+    print $fh "resolvers += Classpaths.sbtPluginReleases\n";
+    print $fh "\n";
+    print $fh qq{addSbtPlugin("org.scoverage" % "sbt-scoverage" % "$ver_for_artifact")\n};
+    close $fh;
+}
