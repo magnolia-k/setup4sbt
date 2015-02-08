@@ -34,13 +34,13 @@ sub init_git {
     my $name = shift;
 
     if ( `which git` ) {
-        chdir $name;
-        `git init`;
-
         open my $fh, '>', File::Spec->catfile( $name, '.gitignore' );
         print $fh "target/\n";
         print $fh "*.class\n";
         close $fh;
+
+        chdir $name;
+        `git init`;
     }
 }
 
@@ -160,8 +160,6 @@ sub fetch_scoverage_version {
     return $sorted[-1];
 }
 
-
-
 sub create_build_sbt {
     my $name = shift;
 
@@ -216,6 +214,6 @@ sub create_plugins_sbt {
     open my $fh, '>', File::Spec->catfile( $name, 'project', 'plugins.sbt' );
     print $fh "resolvers += Classpaths.sbtPluginReleases\n";
     print $fh "\n";
-    print $fh qq{addSbtPlugin("org.scoverage" % "sbt-scoverage" % "$ver_for_artifact")\n};
+    print $fh qq{addSbtPlugin("org.scoverage" % "sbt-scoverage" % "$scoverage")\n};
     close $fh;
 }
