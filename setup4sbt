@@ -37,6 +37,9 @@ sub init_git {
         open my $fh, '>', File::Spec->catfile( $name, '.gitignore' );
         print $fh "target/\n";
         print $fh "*.class\n";
+        print $fh "\n";
+        print $fh "# for vim";
+        print $fh "*.swp";
         close $fh;
 
         chdir $name;
