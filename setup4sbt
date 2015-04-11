@@ -191,6 +191,9 @@ sub create_build_sbt {
     print $fh "\n";
 
     # testing framework
+    print $fh qq{resolvers += "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases"\n};
+    print $fh "\n";
+
     print $fh qq{libraryDependencies += "org.specs2" % "specs2-core_$ver_for_artifact" % "$specs2_version"\n};
 
     close $fh;
