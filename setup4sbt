@@ -166,7 +166,7 @@ sub fetch_scoverage_version {
 sub create_build_sbt {
     my $name = shift;
 
-    my $version         = '0.0.1';
+    my $version         = '0.1.0';
     my $scala_version   = fetch_scala_version();
 
     my @fragment = split( /\./, $scala_version );
