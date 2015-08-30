@@ -35,11 +35,12 @@ sub init_git {
 
     if ( `which git` ) {
         open my $fh, '>', File::Spec->catfile( $name, '.gitignore' );
-        print $fh "target/\n";
+	print $fh "# for scala\n";
+	print $fh "target/\n";
         print $fh "*.class\n";
         print $fh "\n";
-        print $fh "# for vim";
-        print $fh "*.swp";
+        print $fh "# for vim\n";
+        print $fh "*.swp\n";
         close $fh;
 
         chdir $name;
@@ -107,6 +108,35 @@ sub fetch_sbt_version {
     return $sorted[-1];
 }
 
+sub fetch_scalatest_version {
+    my $ver_for_artifact = shift;
+
+    my $site = "http://search.maven.org/solrsearch/select?q=g:%22org.scalatest%22+AND+a:%22scalatest_$ver_for_artifact%22&rows=20&core=gav";
+
+    my $res  = HTTP::Tiny->new->get( $site );
+    
+    die "Can't fetch scalatest's info" unless $res->{success};
+
+    my $json = decode_json( $res->{content} );
+    die "Can't fetch scalatest's version" unless exists $json->{response}{docs};
+
+    my @result;
+    for my $dist ( @{ $json->{response}{docs} } ) {
+        if ( $dist->{v} =~ /^\d+\.\d+(\.\d+)?$/ ) {
+            push @result, version->parse( $dist->{v} );
+        }
+    }
+
+    if ( ! @result ) {
+        die "Can't get scalatest's version";
+    }
+
+    my @sorted = sort @result;
+
+    return $sorted[-1];
+}
+
+
 sub fetch_specs2_version {
     my $ver_for_artifact = shift;
 
@@ -172,7 +202,7 @@ sub create_build_sbt {
     my @fragment = split( /\./, $scala_version );
     my $ver_for_artifact = $fragment[0] . '.' . $fragment[1];
 
-    my $specs2_version = fetch_specs2_version( $ver_for_artifact );
+    my $scalatest_version = fetch_scalatest_version( $ver_for_artifact );
 
     # fetch testing framework's version
 
@@ -191,10 +221,12 @@ sub create_build_sbt {
     print $fh "\n";
 
     # testing framework
-    print $fh qq{resolvers += "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases"\n};
-    print $fh "\n";
+    print $fh qq{libraryDependencies += "org.scalatest" % "scalatest_$ver_for_artifact" % "$scalatest_version"\n};
 
-    print $fh qq{libraryDependencies += "org.specs2" % "specs2-core_$ver_for_artifact" % "$specs2_version"\n};
+#print $fh qq{resolvers += "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases"\n};
+#print $fh "\n";
+
+#print $fh qq{libraryDependencies += "org.specs2" % "specs2-core_$ver_for_artifact" % "$specs2_version"\n};
 
     close $fh;
 
