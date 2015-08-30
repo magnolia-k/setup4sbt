@@ -23,9 +23,9 @@ sub main {
     my $name = shift @ARGV || 'NewProject';
 
     create_dirs( $name );
-    my $ver = create_build_sbt( $name );
+    my $sbt_ver = create_build_sbt( $name );
     create_build_properties( $name );
-    create_plugins_sbt( $name, $ver );
+#    create_plugins_sbt( $name, $sbt_ver );
 
     init_git( $name );
 }
@@ -56,7 +56,7 @@ sub create_dirs {
     my $name = shift;
 
     if ( -d $name ) {
-        die "'$name' already exists.";
+        die "'$name' already exists.\n";
     }
 
     my $dirs = {
@@ -99,7 +99,7 @@ sub fetch_sbt_version {
     die "Can't fetch sbt's version list" unless $res->{success};
 
     my @result;
-    while ( $res->{content} =~ /href="#(0\.\d+\.\d+)\/"/g ) {
+    while ( $res->{content} =~ /href="%(0\.\d+\.\d+)\/"/g ) {
         push @result, version->parse( $1 );
     }
 
@@ -202,9 +202,9 @@ sub create_build_sbt {
     my @fragment = split( /\./, $scala_version );
     my $ver_for_artifact = $fragment[0] . '.' . $fragment[1];
 
-    my $scalatest_version = fetch_scalatest_version( $ver_for_artifact );
-
     # fetch testing framework's version
+#    my $scalatest_version = fetch_scalatest_version( $ver_for_artifact );
+    my $specs2_version    = fetch_specs2_version( $ver_for_artifact );
 
     open my $fh, '>', File::Spec->catfile( $name, 'build.sbt' );
 
@@ -221,12 +221,14 @@ sub create_build_sbt {
     print $fh "\n";
 
     # testing framework
-    print $fh qq{libraryDependencies += "org.scalatest" % "scalatest_$ver_for_artifact" % "$scalatest_version"\n};
+#    print $fh qq{libraryDependencies += "org.scalatest" % "scalatest_$ver_for_artifact" % "$scalatest_version"\n};
 
-#print $fh qq{resolvers += "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases"\n};
-#print $fh "\n";
+    print $fh qq{libraryDependencies ++= Seq("org.specs2" % "specs2-core_$ver_for_artifact" % "$specs2_version" % "test")\n};
 
-#print $fh qq{libraryDependencies += "org.specs2" % "specs2-core_$ver_for_artifact" % "$specs2_version"\n};
+    print $fh qq{scalacOptions in Test ++= Seq("-Yrangepos")\n};
+
+    print $fh "\n";
+    print $fh qq{resolvers += Resolver.url("scoverage-bintray", url("https://dl.bintray.com/sksamuel/sbt-plugins/"))(Resolver.ivyStylePatterns)\n};
 
     close $fh;
 
@@ -252,6 +254,6 @@ sub create_plugins_sbt {
     open my $fh, '>', File::Spec->catfile( $name, 'project', 'plugins.sbt' );
     print $fh "resolvers += Classpaths.sbtPluginReleases\n";
     print $fh "\n";
-    print $fh qq{addSbtPlugin("org.scoverage" % "sbt-scoverage" % "$scoverage")\n};
+    print $fh qq{addSbtPlugin("org.scoverage" % "sbt-scoverage" % "$scoverage")\n\n};
     close $fh;
 }
