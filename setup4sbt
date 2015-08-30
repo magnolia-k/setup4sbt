@@ -84,7 +84,7 @@ sub fetch_scala_version {
 
     my @result;
     while ( $res->{content} =~ /<a href="scala-(2\.\d+\.\d+)\.tgz">/g ) {
-        push @result, version->parse( $1 );
+        push @result, version->declare( $1 );
     }
 
     my @sorted = sort @result;
@@ -100,7 +100,7 @@ sub fetch_sbt_version {
 
     my @result;
     while ( $res->{content} =~ /href="%(0\.\d+\.\d+)\/"/g ) {
-        push @result, version->parse( $1 );
+        push @result, version->declare( $1 );
     }
 
     my @sorted = sort @result;
@@ -123,7 +123,7 @@ sub fetch_scalatest_version {
     my @result;
     for my $dist ( @{ $json->{response}{docs} } ) {
         if ( $dist->{v} =~ /^\d+\.\d+(\.\d+)?$/ ) {
-            push @result, version->parse( $dist->{v} );
+            push @result, version->declare( $dist->{v} );
         }
     }
 
@@ -151,7 +151,7 @@ sub fetch_specs2_version {
 
     my @result;
     for my $dist ( @{ $json->{response}{docs} } ) {
-        if ( $dist->{v} =~ /^\d+\.\d+(\.\d+)?$/ ) {
+        if ( $dist->{v} =~ /^\d+\.\d+\.\d+$/ ) {
             push @result, version->parse( $dist->{v} );
         }
     }
@@ -223,12 +223,13 @@ sub create_build_sbt {
     # testing framework
 #    print $fh qq{libraryDependencies += "org.scalatest" % "scalatest_$ver_for_artifact" % "$scalatest_version"\n};
 
-    print $fh qq{libraryDependencies ++= Seq("org.specs2" % "specs2-core_$ver_for_artifact" % "$specs2_version" % "test")\n};
-
-    print $fh qq{scalacOptions in Test ++= Seq("-Yrangepos")\n};
+    print $fh qq{libraryDependencies ++= Seq("org.specs2" %% "specs2-core" % "$specs2_version" % "test")\n};
 
     print $fh "\n";
-    print $fh qq{resolvers += Resolver.url("scoverage-bintray", url("https://dl.bintray.com/sksamuel/sbt-plugins/"))(Resolver.ivyStylePatterns)\n};
+    print $fh qq{scalacOptions in Test ++= Seq("-Yrangepos")\n};
+
+#    print $fh "\n";
+#    print $fh qq{resolvers += Resolver.url("scoverage-bintray", url("https://dl.bintray.com/sksamuel/sbt-plugins/"))(Resolver.ivyStylePatterns)\n};
 
     close $fh;
 
