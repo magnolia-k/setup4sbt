@@ -99,7 +99,7 @@ sub fetch_sbt_version {
     die "Can't fetch sbt's version list" unless $res->{success};
 
     my @result;
-    while ( $res->{content} =~ /href="%(0\.\d+\.\d+)\/"/g ) {
+    while ( $res->{content} =~ /href=":(0\.\d+\.\d+)\/"/g ) {
         push @result, version->declare( $1 );
     }
 
