@@ -25,7 +25,7 @@ sub main {
     create_dirs( $name );
     my $sbt_ver = create_build_sbt( $name );
     create_build_properties( $name );
-#    create_plugins_sbt( $name, $sbt_ver );
+    create_plugins_sbt( $name, $sbt_ver );
 
     init_git( $name );
 }
