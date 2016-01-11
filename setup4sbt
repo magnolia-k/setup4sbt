@@ -250,7 +250,7 @@ sub create_plugins_sbt {
     my $name = shift;
     my $ver_for_artifact = shift;
     
-    my $scoverage = fetch_scoverage_version( $ver_for_artifact );
+    my $scoverage = fetch_sbt_scoverage_version( $ver_for_artifact );
 
     open my $fh, '>', File::Spec->catfile( $name, 'project', 'plugins.sbt' );
     print $fh "resolvers += Classpaths.sbtPluginReleases\n";
@@ -258,3 +258,32 @@ sub create_plugins_sbt {
     print $fh qq{addSbtPlugin("org.scoverage" % "sbt-scoverage" % "$scoverage")\n\n};
     close $fh;
 }
+
+sub fetch_sbt_scoverage_version {
+
+    my $site = "http://search.maven.org/solrsearch/select?q=g:%22org.scoverage%22+AND+a:%22sbt-scoverage%22&rows=20&core=gav";
+
+    my $res  = HTTP::Tiny->new->get( $site );
+    
+    die "Can't fetch sbt-scoverage's info" unless $res->{success};
+
+    my $json = decode_json( $res->{content} );
+    die "Can't fetch sbt-scoverage's version" unless exists $json->{response}{docs};
+
+    my @result;
+    for my $dist ( @{ $json->{response}{docs} } ) {
+        if ( $dist->{v} =~ /^\d+\.\d+(\.\d+)?$/ ) {
+            push @result, version->parse( $dist->{v} );
+        }
+    }
+
+    if ( ! @result ) {
+        die "Can't get sbt-scoverage's version";
+    }
+
+    my @sorted = sort @result;
+
+    return $sorted[-1];
+}
+
+
